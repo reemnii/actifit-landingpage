@@ -38,6 +38,18 @@
           </div>
         </div>
 
+        <!-- Account actions (only shown on the signed-in user's profile) -->
+        <div v-if="user && isOwnAccount()" class="profile-account-actions">
+          <button type="button" class="btn profile-action-btn" @click="showModalFunc">
+            <i class="fas fa-user-group" aria-hidden="true"></i>
+            <span>{{ $t('switch_user') }}</span>
+          </button>
+          <button type="button" class="btn profile-action-btn" @click="proceedLogout">
+            <i class="fas fa-right-from-bracket" aria-hidden="true"></i>
+            <span>{{ $t('Logout') }}</span>
+          </button>
+        </div>
+
         <!-- Friendship action buttons -->
         <div v-if="user && !isOwnAccount() && !account_banned" class="friend-actions">
             <span :title="$t('you_are_friends_username').replace('_USERNAME_', displayUser)" v-if="isFriend()">
@@ -558,7 +570,7 @@ import SSC from 'sscjs'
 const hsc = new SSC(process.env.hiveEngineRpc);
 import NotifyModal from '~/components/NotifyModal'
 import Lodash from 'lodash';
-import { buildMeasurementsMetadata, convertMeasurementValue, MEASUREMENT_KEYS, MEASUREMENT_UNIT_OPTIONS, mergeMeasurementSources, normalizeMeasurements, normalizeMeasurementUnit, selectLatestMeasurements } from '~/utils/measurements'
+import { buildMeasurementsMetadata, convertMeasurementValue, MEASUREMENT_KEYS, MEASUREMENT_UNIT_OPTIONS, mergeMeasurementSources, normalizeMeasurements, normalizeMeasurementUnit, selectLatestMeasurements, waitForMeasurementSave } from '~/utils/measurements'
 
 export default {
   head() {
@@ -852,9 +864,17 @@ export default {
     }
   },
   methods: {
+    proceedLogout() {
+      this.$store.commit('setStdLoginUser', false);
+      if (process.client) {
+        localStorage.removeItem('std_login');
+        localStorage.removeItem('std_login_name');
+      }
+      this.$store.dispatch('steemconnect/logout');
+    },
     showModalFunc() {
+      this.showModal = true;
       this.$nextTick(() => {
-        this.showModal = true;
         if ($ && typeof $.fn.modal === 'function') {
           $('#loginModal').modal('show');
         }
@@ -1010,17 +1030,28 @@ export default {
       this.measurementSaveError = '';
       try {
         const measurements = normalizeMeasurements({ ...values, updated_at: new Date().toISOString() });
-        const parsedData = this.getProfileMetadata();
+        const timeoutError = this.$t('error_performing_operation');
+        const metadataOutcome = await waitForMeasurementSave(
+          this.getLiveProfileMetadata().then(metadata => ({ success: true, metadata })),
+          timeoutError
+        );
+        if (!metadataOutcome.success) throw new Error(metadataOutcome.error || this.$t('Save_Error'));
+
+        const parsedData = metadataOutcome.metadata;
         const postingMetadata = buildMeasurementsMetadata(parsedData, measurements);
-        const jsonMetadata = await this.getLiveAccountJsonMetadata();
         const transaction = {
           account: this.user.account.name,
-          json_metadata: jsonMetadata,
+          // Empty is account_update2's no-change sentinel for legacy metadata.
+          // A non-empty value would require the active key instead of posting.
+          json_metadata: '',
           posting_json_metadata: JSON.stringify(postingMetadata),
           extensions: []
         };
-        const outcome = await this.$processTrxFunc('account_update2', transaction);
-        if (!outcome || !outcome.success) throw new Error(this.$t('Save_Error'));
+        const outcome = await waitForMeasurementSave(
+          this.$processTrxFunc('account_update2', transaction, false),
+          timeoutError
+        );
+        if (!outcome || !outcome.success) throw new Error((outcome && outcome.error) || this.$t('Save_Error'));
 
         this.userinfo = { ...this.userinfo, posting_json_metadata: transaction.posting_json_metadata };
         this.applyMeasurementSources();
@@ -1056,11 +1087,11 @@ export default {
         ...parsedData,
         profile: nextProfile
       }
-      const jsonMetadata = await this.getLiveAccountJsonMetadata();
       let transaction = {
-        account: this.user.account.name, json_metadata: jsonMetadata, posting_json_metadata: JSON.stringify(pst), extensions: []
+        // Empty preserves legacy metadata while keeping this a posting-authority update.
+        account: this.user.account.name, json_metadata: '', posting_json_metadata: JSON.stringify(pst), extensions: []
       };
-      return await this.$processTrxFunc('account_update2', transaction);
+      return await this.$processTrxFunc('account_update2', transaction, false);
     },
     async updateProfileImage(imageUrl) {
         this.updatingField = 'profile_image';
@@ -1737,19 +1768,25 @@ export default {
       }
       return properNode;
     },
-    async getLiveAccountJsonMetadata() {
+    async getLiveProfileMetadata() {
       const accountName = this.user && this.user.account && this.user.account.name;
-      if (!accountName) throw new Error('Unable to refresh account metadata');
+      if (!accountName) throw new Error(this.$t('Save_Error'));
 
       const chainLnk = this.setProperNode();
       return new Promise((resolve, reject) => {
         chainLnk.api.getAccounts([accountName], (err, result) => {
           const account = Array.isArray(result) ? result[0] : null;
-          if (err || !account || typeof account.json_metadata !== 'string') {
-            reject(err || new Error('Unable to refresh account metadata'));
+          if (err || !account || typeof account.posting_json_metadata !== 'string') {
+            reject(err || new Error(this.$t('Save_Error')));
             return;
           }
-          resolve(account.json_metadata);
+
+          try {
+            resolve(account.posting_json_metadata ? JSON.parse(account.posting_json_metadata) || {} : {});
+          } catch (parseError) {
+            console.error('Unable to parse live profile metadata', parseError);
+            resolve({});
+          }
         });
       });
     },
@@ -2146,6 +2183,33 @@ html.dark-mode .user-info-header .join-date {
     flex-shrink: 0;
 }
 .user-info-header { margin-left: 20px; }
+.profile-account-actions {
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.profile-action-btn {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+  background-color: var(--brand-color);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 10px;
+  font-weight: 600;
+  box-shadow: var(--box-shadow-lifted);
+  transition: transform 0.2s, opacity 0.2s;
+}
+.profile-action-btn:hover,
+.profile-action-btn:focus {
+  color: #fff;
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
 .avatar-edit-button {
   position: absolute;
   bottom: 5px;
@@ -2505,6 +2569,14 @@ html.dark-mode .interactive-prompt {
         margin-left: 0;
         text-align: center;
         width: 100%;
+    }
+    .profile-account-actions {
+        width: 100%;
+        max-width: 320px;
+        flex-direction: row;
+    }
+    .profile-action-btn {
+        flex: 1;
     }
     .wallet-top-actions {
         flex-direction: column;
