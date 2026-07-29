@@ -1051,6 +1051,7 @@ export default {
           this.$processTrxFunc('account_update2', transaction, false),
           timeoutError
         );
+        if (outcome && outcome.error === 'user_cancel') return;
         if (!outcome || !outcome.success) throw new Error((outcome && outcome.error) || this.$t('Save_Error'));
 
         this.userinfo = { ...this.userinfo, posting_json_metadata: transaction.posting_json_metadata };
@@ -2209,6 +2210,10 @@ html.dark-mode .user-info-header .join-date {
   color: #fff;
   opacity: 0.9;
   transform: translateY(-1px);
+}
+html.dark-mode .profile-action-btn {
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: none;
 }
 .avatar-edit-button {
   position: absolute;
