@@ -33,17 +33,17 @@
                 <span class="mb-1 form-control-lg " style="display: none">
                   <div class="bchain-option p-1 m-1 btn" :class="adjustHiveClass">
                     <input type="radio" id="hive_bchain" value="HIVE" v-model="bchain_val">
-                    <img src="/img/HIVE.png" style="max-height: 50px;" v-on:click="bchain_val = 'HIVE'">
+                    <img src="/img/HIVE.png" style="max-height: 50px;" v-on:click="bchain_val = 'HIVE'" alt="Select Hive blockchain">
                     <label for="hive_bchain">{{ $t('HIVE') }}</label>
                   </div>
                   <div class="bchain-option p-1 m-1 btn m-auto" :class="adjustSteemClass" style="display:none">
                     <input type="radio" id="steem_bchain" value="STEEM" v-model="bchain_val">
-                    <img src="/img/STEEM.png" style="max-height: 50px;" v-on:click="bchain_val = 'STEEM'" >
+                    <img src="/img/STEEM.png" style="max-height: 50px;" v-on:click="bchain_val = 'STEEM'" alt="Select Steem blockchain" >
                     <label for="steem_bchain">{{ $t('STEEM') }}</label>
                   </div>
                   <div class="bchain-option p-1 m-1 btn" :class="adjustBlurtClass">
                     <input type="radio" id="blurt_bchain" value="BLURT" v-model="bchain_val">
-                    <img src="/img/BLURT.png" style="max-height: 50px;" v-on:click="bchain_val = 'BLURT'" >
+                    <img src="/img/BLURT.png" style="max-height: 50px;" v-on:click="bchain_val = 'BLURT'" alt="Select Blurt blockchain" >
                     <label for="blurt_bchain">{{ $t('BLURT') }}</label>
                   </div>
                 </span>
@@ -149,8 +149,8 @@
       setKeychainLoginStatus (json){
         if (json && json.success && json.token && json.userdata){ const recaptcha = this.$recaptchaInstance; recaptcha.hideBadge(); let acct_data = json.userdata; let userSC = new Object(); userSC.account = acct_data; this.is_logged_in = true; this.$store.commit('setStdLoginUser', true); localStorage.setItem('access_token', json.token); localStorage.setItem('std_login', true); localStorage.setItem('std_login_name', userSC.account.name); localStorage.setItem('acti_login_method', 'keychain'); this.$store.commit('steemconnect/login', userSC); this.closeModal(); this.resetForm(); this.$store.dispatch('steemconnect/refreshUser'); this.$store.dispatch('fetchModerators'); }else{ this.error_proceeding = true; this.login_in_progress = false; this.error_msg = this.$t('login_error'); return; }
       },
-      setUserLoginStatus (json) {
-        this.is_logged_in = json.success; if (json.success && json.token){ const recaptcha = this.$recaptchaInstance; recaptcha.hideBadge(); localStorage.setItem('actiToken', json.token); let userSC = new Object(); userSC.account = json.userdata; this.$store.commit('setStdLoginUser', true); localStorage.setItem('access_token', json.token); localStorage.setItem('std_login', true); localStorage.setItem('std_login_name', userSC.account.name); localStorage.setItem('acti_login_method', ''); this.$store.commit('steemconnect/login', userSC); this.closeModal(); this.resetForm(); this.$store.dispatch('steemconnect/refreshUser'); this.$store.dispatch('fetchModerators'); this.$emit('login-successful'); }else{ this.error_proceeding = true; this.login_in_progress = false; this.error_msg = this.$t('login_error'); }
+      setUserLoginStatus (json, postingKey) {
+        this.is_logged_in = json.success; if (json.success && json.token){ const recaptcha = this.$recaptchaInstance; recaptcha.hideBadge(); localStorage.setItem('actiToken', json.token); let userSC = new Object(); userSC.account = json.userdata; this.$store.commit('setStdLoginUser', true); this.$store.commit('setChatPostingKey', postingKey); localStorage.setItem('access_token', json.token); localStorage.setItem('std_login', true); localStorage.setItem('std_login_name', userSC.account.name); localStorage.setItem('acti_login_method', ''); this.$store.commit('steemconnect/login', userSC); this.closeModal(); this.resetForm(); this.$store.dispatch('steemconnect/refreshUser'); this.$store.dispatch('fetchModerators'); this.$emit('login-successful'); }else{ this.error_proceeding = true; this.login_in_progress = false; this.error_msg = this.$t('login_error'); }
       },
       verifyHiveauth (challenge, data){ const sig = Signature.fromHex(data.challenge); const buf = hash.sha256(challenge, null, 0); return sig.verifyHash(buf, PublicKey.fromString(data.pubkey)); },
 async loginHiveauth (){
@@ -244,7 +244,7 @@ async loginHiveauth (){
           });
           clearTimeout(timeoutId);
           const json = await res.json();
-          this.setUserLoginStatus(json);
+          this.setUserLoginStatus(json, priv_pkey);
         } catch (e) {
           console.error('Login error:', e);
           this.error_proceeding = true;

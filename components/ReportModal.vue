@@ -2,7 +2,7 @@
   <div class="modal fade" id="reportModal" ref="reportModal" tabindex="-1">
     <div class="modal-dialog modal-lg" role="document">
       <div class="modal-content" v-if="report">
-        <div class="modal-header">
+        <div class="modal-header report-navigation">
           <div class="col-12">
             <button type="button" class="btn btn-link float-left" @click="loadNextReport(-1)"><i
                 class="fas fa-chevron-left"></i> Previous Report</button>
@@ -10,13 +10,13 @@
                 class="fas fa-chevron-right"></i></button>
           </div>
         </div>
-        <div class="modal-header">
+        <div class="modal-header report-title-header">
           <h2 class="modal-title" id="exampleModalLabel">{{ report.title }}</h2><br />
           <button type="button" class="close" data-dismiss="modal" aria-label="Close">
             <span aria-hidden="true">×</span>
           </button>
         </div>
-        <div class="main-user-info pl-4">
+        <div class="main-user-info pl-4 report-user-section">
 
           <div>
 
@@ -63,9 +63,6 @@
         </div>
         <SafeRemarkable class="modal-body" :source="displayBody" ref="remarkableContent"
           :options="{ 'html': true, 'breaks': true, 'typographer': true }"></SafeRemarkable>
-        <div class="modal-body goog-ad-horiz-90">
-          <adsbygoogle ad-slot="5716623705" />
-        </div>
         <div class="col-12 main-payment-info" id="modal-footer">
           <div class="report-modal-prelim-info">
             <span><a href="#" @click.prevent="toggleCommentBox()" :title="$t('Reply')"><i
@@ -87,27 +84,27 @@
             </span>
             <div>
               <span :title="afitReward + ' ' + $t('AFIT_Token')">
-                <img src="/img/actifit_logo.png" class="mr-1 currency-logo-small">{{ afitReward }} {{ $t('AFIT_Token')
+                <img src="/img/actifit_logo.png" class="mr-1 currency-logo-small" alt="">{{ afitReward }} {{ $t('AFIT_Token')
                 }}
               </span>
 
-              <img src="/img/STEEM.png" class="mr-0 currency-logo-small" v-if="cur_bchain == 'STEEM'">
-              <img src="/img/HIVE.png" class="mr-0 currency-logo-small" v-else-if="cur_bchain == 'HIVE'">
-              <img src="/img/BLURT.png" class="mr-0 currency-logo-small" v-else-if="cur_bchain == 'BLURT'">
+              <img src="/img/STEEM.png" class="mr-0 currency-logo-small" v-if="cur_bchain == 'STEEM'" alt="">
+              <img src="/img/HIVE.png" class="mr-0 currency-logo-small" v-else-if="cur_bchain == 'HIVE'" alt="">
+              <img src="/img/BLURT.png" class="mr-0 currency-logo-small" v-else-if="cur_bchain == 'BLURT'" alt="">
 
               <span v-if="postPaid()">
-                <span class="m-1" :title="$t('author_payout')">
+                <span class="m-1" :class="{ 'declined-payout': isDeclined }" :title="$t('author_payout')">
                   <i class="fa-solid fa-user"></i>
                   {{ paidValue() }}
                 </span>
-                <span class="m-1" :title="$t('voters_payout')">
+                <span class="m-1" :class="{ 'declined-payout': isDeclined }" :title="$t('voters_payout')">
                   <i class="fa-solid fa-users"></i>
                   {{ report.curator_payout_value }}
                 </span>
                 <i class="fa-solid fa-check text-green text-bold"></i>
               </span>
               <span v-else>
-                <span class="text-bold">{{ report.pending_payout_value.replace('SBD', '') }}</span>
+                <span class="text-bold" :class="{ 'declined-payout': isDeclined }">{{ report.pending_payout_value.replace('SBD', '') }}</span>
                 <i class="fa-solid fa-hourglass-half text-brand m-1" :title="$t('hive_payouts_wait')"></i>
               </span>
               <span v-if="hasBeneficiaries()" :title="beneficiariesDisplay()">
@@ -166,21 +163,21 @@
             <CustomTextEditor ref="editor" :initialContent="replyBody"></CustomTextEditor>
             <div class="modal-footer m-2" style="display:none">
               <div class="bchain-option btn col-6 p-2 row text-left mx-auto" v-if="cur_bchain == 'HIVE'">
-                <input type="radio" id="hive" value="HIVE" v-model="target_bchain"><img src="/img/HIVE.png" style="max-height: 50px" v-on:click="target_bchain = 'HIVE'" :class="adjustHiveClass"><label for="hive">HIVE ONLY</label>
+                <input type="radio" id="hive" value="HIVE" v-model="target_bchain"><img src="/img/HIVE.png" style="max-height: 50px" v-on:click="target_bchain = 'HIVE'" :class="adjustHiveClass" alt="Select Hive blockchain"><label for="hive">HIVE ONLY</label>
               </div>
               <div class="bchain-option btn col-6 p-2 row text-left mx-auto" v-else-if="cur_bchain == 'STEEM'">
-                <input type="radio" id="steem" value="STEEM" v-model="target_bchain"><img src="/img/STEEM.png" style="max-height: 50px" v-on:click="target_bchain = 'STEEM'" :class="adjustSteemClass"><label for="steem">STEEM ONLY</label>
+                <input type="radio" id="steem" value="STEEM" v-model="target_bchain"><img src="/img/STEEM.png" style="max-height: 50px" v-on:click="target_bchain = 'STEEM'" :class="adjustSteemClass" alt="Select Steem blockchain"><label for="steem">STEEM ONLY</label>
               </div>
               <div class="bchain-option btn col-6 p-2 row text-left  mx-auto">
-                <input type="radio" id="hive_steem" value="BOTH" v-model="target_bchain"><img src="/img/HIVE.png" v-on:click="target_bchain = 'BOTH'" style="max-height: 50px" :class="adjustBothClass"><img src="/img/STEEM.png" v-on:click="target_bchain = 'BOTH'" style="max-height: 50px" :class="adjustBothClass"><label for="hive_steem">HIVE + STEEM</label>
+                <input type="radio" id="hive_steem" value="BOTH" v-model="target_bchain"><img src="/img/HIVE.png" v-on:click="target_bchain = 'BOTH'" style="max-height: 50px" :class="adjustBothClass" alt="Select multiple blockchains"><img src="/img/STEEM.png" v-on:click="target_bchain = 'BOTH'" style="max-height: 50px" :class="adjustBothClass" alt="Select multiple blockchains"><label for="hive_steem">HIVE + STEEM</label>
               </div>
             </div>
             <a href="#" @click.prevent="postResponse($event)" class="btn btn-brand border reply-btn w-25">
               {{ $t('Post') }}
               <img src="/img/HIVE.png" style="max-height: 25px"
-                v-if="target_bchain == 'HIVE' || target_bchain == 'BOTH'">
+                v-if="target_bchain == 'HIVE' || target_bchain == 'BOTH'" alt="">
               <img src="/img/STEEM.png" style="max-height: 25px"
-                v-if="target_bchain == 'STEEM' || target_bchain == 'BOTH'">
+                v-if="target_bchain == 'STEEM' || target_bchain == 'BOTH'" alt="">
               <i class="fas fa-spin fa-spinner" v-if="loading"></i>
             </a>
             <a href="#" @click.prevent="resetOpenComment()" class="btn btn-brand border reply-btn w-25">{{ $t('Cancel') }}</a>
@@ -229,11 +226,13 @@ import SafeRemarkable from '~/components/SafeRemarkable.vue'
 import SocialSharing from 'vue-social-sharing';
 import VueScrollTo from 'vue-scrollto'
 import { translateTextWithGemini } from '~/components/gemini-client.js';
+import { declinedPayoutMixin } from '~/plugins/commonCardMixin.js'
 
 const scot_steemengine_api = process.env.steemEngineScot;
 const scot_hive_api_param = process.env.hiveEngineScotParam;
 
 export default {
+  mixins: [declinedPayoutMixin],
   data() {
     return {
       translationCache: {},
@@ -290,6 +289,7 @@ export default {
     UserHoverCard
   },
   computed: {
+    cardData() { return this.report },
     ...mapGetters('steemconnect', ['user']),
     ...mapGetters('steemconnect', ['stdLogin']),
     ...mapGetters(['commentEntries'], 'commentCountToday'),
@@ -777,6 +777,63 @@ export default {
 
 .modal-content {
   transform: none !important;
+}
+
+#reportModal .report-navigation {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+#reportModal .report-title-header {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+#reportModal .report-title-header .modal-title {
+  margin-bottom: 0;
+}
+
+#reportModal .report-user-section {
+  padding-top: 14px;
+}
+
+#reportModal .modal-body img[src*="ACTIVITYDATE"] + .text-center,
+#reportModal .modal-body img[src*="ACTIVITYCOUNT"] + .text-center,
+#reportModal .modal-body img[src*="ACTIVITYTYPE"] + .text-center {
+  height: 44px;
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color) !important;
+  text-align: center;
+}
+
+#reportModal .modal-body img[src*="ACTIVITYCOUNT"] {
+  margin-top: 10px;
+}
+
+#reportModal .modal-body img[src*="ACTIVITYDATE"] + .text-center *,
+#reportModal .modal-body img[src*="ACTIVITYCOUNT"] + .text-center *,
+#reportModal .modal-body img[src*="ACTIVITYTYPE"] + .text-center * {
+  color: var(--text-color) !important;
+}
+
+#reportModal .modal-body img[src*="ACTIVITYTYPE"] + .text-center pre {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-color) !important;
+  text-align: center;
+}
+
+html:not(.dark-mode) #reportModal .modal-body img[src*="ACTIVITYCOUNT"] + .text-center,
+html:not(.dark-mode) #reportModal .modal-body img[src*="ACTIVITYCOUNT"] + .text-center *,
+html:not(.dark-mode) #reportModal .modal-body img[src*="ACTIVITYTYPE"] + .text-center,
+html:not(.dark-mode) #reportModal .modal-body img[src*="ACTIVITYTYPE"] + .text-center * {
+  color: #000 !important;
 }
 
 .modal-author {

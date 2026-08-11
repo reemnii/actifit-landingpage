@@ -26,7 +26,7 @@
           </div>
           <div class="user-info-header">
             <div class="d-flex align-items-center">
-                <span class="username">@{{ displayUser }}</span>
+                <h1 class="username mb-0">@{{ displayUser }}</h1>
                 <span class="user-rank-badge ml-2">{{ displayCoreUserRank }}</span>
                 <span v-if="user && user.account.name === displayUser && !account_banned" class="edit-profile-btn ml-2">
                   <a @click="editOn ? turnEditOff() : turnEditOn()">
@@ -36,6 +36,18 @@
             </div>
             <div class="join-date">{{ $t('Joined_On') }} {{ pureDate(userinfo.created) }}</div>
           </div>
+        </div>
+
+        <!-- Account actions (only shown on the signed-in user's profile) -->
+        <div v-if="user && isOwnAccount()" class="profile-account-actions">
+          <button type="button" class="btn profile-action-btn" @click="showModalFunc">
+            <i class="fas fa-user-group" aria-hidden="true"></i>
+            <span>{{ $t('switch_user') }}</span>
+          </button>
+          <button type="button" class="btn profile-action-btn" @click="proceedLogout">
+            <i class="fas fa-right-from-bracket" aria-hidden="true"></i>
+            <span>{{ $t('Logout') }}</span>
+          </button>
         </div>
 
         <!-- Friendship action buttons -->
@@ -140,17 +152,46 @@
             <!-- Fitness Tab -->
             <div v-if="activeTab === 'fitness'" class="fitness-tab-container">
                 <div class="fitness-section-grid-measurements">
-                    <div class="fitness-card"><img src="https://usermedia.actifit.io/height.png"><div>{{ $t('Height') }}</div><div class="value">{{ lastHeight + ' ' + heightUnit }}</div></div>
-                    <div class="fitness-card"><img src="https://usermedia.actifit.io/bodyfat.png"><div>{{ $t('Body_Fat') }}</div><div class="value">{{ lastBodyfat + ' % ' }}</div></div>
-                    <div class="fitness-card"><img src="https://usermedia.actifit.io/waist.png"><div>{{ $t('Waist') }}</div><div class="value">{{ lastWaist + ' ' + waistUnit }}</div></div>
-                    <div class="fitness-card"><img src="https://usermedia.actifit.io/weight.png"><div>{{ $t('Weight') }}</div><div class="value">{{ lastWeight + ' ' + weightUnit }}</div></div>
-                    <div class="fitness-card"><img src="https://usermedia.actifit.io/chest.png"><div>{{ $t('Chest') }}</div><div class="value">{{ lastChest + ' ' + chestUnit }}</div></div>
-                    <div class="fitness-card"><img src="https://usermedia.actifit.io/thighs.png"><div>{{ $t('Thighs') }}</div><div class="value">{{ lastThighs + ' ' + thighsUnit }}</div></div>
+                    <div class="fitness-card"><img src="https://usermedia.actifit.io/height.png" alt=""><div>{{ $t('Height') }}</div><div class="value">{{ lastHeight + ' ' + heightUnit }}</div></div>
+                    <div class="fitness-card"><img src="https://usermedia.actifit.io/bodyfat.png" alt=""><div>{{ $t('Body_Fat') }}</div><div class="value">{{ lastBodyfat + ' % ' }}</div></div>
+                    <div class="fitness-card"><img src="https://usermedia.actifit.io/waist.png" alt=""><div>{{ $t('Waist') }}</div><div class="value">{{ lastWaist + ' ' + waistUnit }}</div></div>
+                    <div class="fitness-card"><img src="https://usermedia.actifit.io/weight.png" alt=""><div>{{ $t('Weight') }}</div><div class="value">{{ lastWeight + ' ' + weightUnit }}</div></div>
+                    <div class="fitness-card"><img src="https://usermedia.actifit.io/chest.png" alt=""><div>{{ $t('Chest') }}</div><div class="value">{{ lastChest + ' ' + chestUnit }}</div></div>
+                    <div class="fitness-card"><img src="https://usermedia.actifit.io/thighs.png" alt=""><div>{{ $t('Thighs') }}</div><div class="value">{{ lastThighs + ' ' + thighsUnit }}</div></div>
                 </div>
-                <div class="fitness-action-btn-container">
-                    <a href="#" data-toggle="modal" class="btn btn-danger" data-target="#measureChartModal" v-if="isFriend() || isOwnAccount()">{{ $t('Stats_chart') }}</a>
-                    <a href="#" class="btn btn-danger" @click.prevent="displayAddFriendStats = !displayAddFriendStats" v-else-if="user">{{ $t('Stats_chart') }}</a>
-                    <a href="#" class="btn btn-danger" @click.prevent="displayLoginStats = !displayLoginStats" v-else>{{ $t('Stats_chart') }}</a>
+                <div class="fitness-measurements-editor">
+                    <div class="fitness-measurements-toolbar">
+                    <button v-if="canEditMeasurements && !measurementsEditOn" class="btn btn-danger" @click="turnMeasurementsEditOn">
+                        <i class="fas fa-edit mr-1"></i> {{ $t('Edit_measurements') }}
+                    </button>
+                        <a href="#" data-toggle="modal" class="btn btn-danger" data-target="#measureChartModal" v-if="isFriend() || isOwnAccount()"><i class="fas fa-chart-line mr-1"></i> {{ $t('Stats_chart') }}</a>
+                        <a href="#" class="btn btn-danger" @click.prevent="displayAddFriendStats = !displayAddFriendStats" v-else-if="user"><i class="fas fa-chart-line mr-1"></i> {{ $t('Stats_chart') }}</a>
+                        <a href="#" class="btn btn-danger" @click.prevent="displayLoginStats = !displayLoginStats" v-else><i class="fas fa-chart-line mr-1"></i> {{ $t('Stats_chart') }}</a>
+                    </div>
+                    <form v-if="canEditMeasurements && measurementsEditOn" class="measurement-form" @submit.prevent="saveMeasurements">
+                        <div class="measurement-form-grid">
+                            <label v-for="field in measurementFields" :key="field.key" class="measurement-field">
+                                <span>{{ $t(field.label) }}</span>
+                                <span class="measurement-input-group">
+                                    <input v-model.trim="measurementDraft[field.key]" type="number" min="0" step="any" inputmode="decimal">
+                                    <select v-if="field.unitKey" class="measurement-unit" :value="measurementDraft[field.unitKey]" @change="changeMeasurementUnit(field.key, $event.target.value)">
+                                        <option v-for="unit in measurementUnitOptions[field.key]" :key="unit" :value="unit">{{ unit }}</option>
+                                    </select>
+                                    <span v-else class="measurement-unit-label">%</span>
+                                </span>
+                            </label>
+                        </div>
+                        <div v-if="measurementSaveError" class="text-danger small mb-2">{{ measurementSaveError }}</div>
+                        <div class="measurement-form-actions">
+                            <button class="btn btn-success" type="submit" :disabled="savingMeasurements">
+                                <i v-if="savingMeasurements" class="fas fa-spinner fa-spin mr-1"></i>{{ $t('Save') }}
+                            </button>
+                            <button class="btn btn-secondary" type="button" :disabled="savingMeasurements" @click="turnMeasurementsEditOff">{{ $t('Cancel') }}</button>
+                        </div>
+                    </form>
+                    <div v-if="lastUpdated && lastUpdated !== '-'" class="measurement-updated small">
+                        {{ $t('Measurements_updated') }}: {{ pureDate(lastUpdated) }}
+                    </div>
                 </div>
                  <div v-show="displayAddFriendStats" class="interactive-prompt mt-2">
                     <div>{{ $t('View_chart_notice').replace('_USER', this.username) }}</div>
@@ -166,7 +207,7 @@
                 <div class="fitness-section-grid-activity">
                     <div class="fitness-card activity-card">
                         <div>{{ $t('Latest_Activity_Count') }}</div>
-                        <img src="/img/actifit_logo.png" class="activity-small-logo">
+                        <img src="/img/actifit_logo.png" class="activity-small-logo" alt="">
                         <div class="value">{{ lastActivityCount }}</div>
                     </div>
                     <div class="fitness-card activity-card">
@@ -198,7 +239,7 @@
               <!-- Key added -->
               <div class="community-item" key="posh-item">
                 <div class="community-item-content">
-                  <img src="/img/poshlogo.png" class="mr-3" style="width: 50px;">
+                  <img src="/img/poshlogo.png" class="mr-3" style="width: 50px;" alt="">
                   <div class="flex-grow-1">
                     <span v-if="poshVerified">
                       <i class="fas fa-check text-success" style="font-size:large"></i> {{ $t('Posh_connected') }}:
@@ -221,14 +262,14 @@
                         </span>
                     </div>
                   </div>
-                  <a class="btn btn-danger m-2" :href="'/friends?username=' + encodeURIComponent(displayUser)">{{ $t('View_friends') }}</a>
+                  <a class="btn btn-danger m-2" :href="'/' + displayUser + '/friends'">{{ $t('View_friends') }}</a>
                 </div>
               </div>
               <!-- Key added -->
               <div class="community-item" key="rewarded-reports-item">
                 <div class="community-item-content">
                   <a :href="'/activity/' + displayUser">
-                    <img src="/img/actifit_logo.png" class="mr-2 token-logo">
+                    <img src="/img/actifit_logo.png" class="mr-2 token-logo" alt="">
                     {{ numberFormat(rewardedPostCount, 0) }} {{ $t('Activity_Reports_Rewarded') }}
                   </a>
                   <a :href="'/activity/' + displayUser" class="btn btn-danger m-2">{{ $t('View_reports') }}</a>
@@ -238,7 +279,7 @@
                <div class="community-item" key="hive-posts-item">
                  <div class="community-item-content">
                     <a :href="'/' + displayUser + '/blog'">
-                      <img src="/img/HIVE.png" class="mr-2 token-logo">
+                      <img src="/img/HIVE.png" class="mr-2 token-logo" alt="">
                       {{ userinfo.post_count ? numberFormat(userinfo.post_count, 0) : '0' }} {{ $t('Steem_posts_comments') }}
                     </a>
                     <a :href="'/' + displayUser + '/blog'" class="btn btn-danger m-2">{{ $t('View_blog') }}</a>
@@ -261,7 +302,7 @@
               <div class="community-item" key="3speak-item">
                 <div class="community-item-content">
                   <a :href="'/' + displayUser + '/videos'">
-                    <img src="/img/3speak.png" class="mr-2 token-logo">
+                    <img src="/img/3speak.png" class="mr-2 token-logo" alt="">
                     {{ numberFormat(video_count_3s, 0) }} {{ $t('Videos_3speak') }}
                   </a>
                   <a :href="'/' + displayUser + '/videos'" class="btn btn-danger m-2">{{ $t('View_videos') }}</a>
@@ -321,7 +362,7 @@
                   <!-- HIVE Card -->
                   <div class="balance-card">
                     <div class="balance-card-header">
-                        <img src="/img/HIVE.png" class="token-logo">
+                        <img src="/img/HIVE.png" class="token-logo" alt="">
                         <span>HIVE</span>
                     </div>
                     <div class="balance-card-value">{{ hiveBalance }}</div>
@@ -330,7 +371,7 @@
                   <!-- HBD Card -->
                   <div class="balance-card">
                     <div class="balance-card-header">
-                        <img src="/img/HIVE.png" class="token-logo">
+                        <img src="/img/HIVE.png" class="token-logo" alt="">
                         <span>HBD</span>
                     </div>
                     <div class="balance-card-value">{{ hbdBalance }}</div>
@@ -339,7 +380,7 @@
                   <!-- HP Card -->
                   <div class="balance-card">
                     <div class="balance-card-header">
-                        <img src="/img/HIVE.png" class="token-logo">
+                        <img src="/img/HIVE.png" class="token-logo" alt="">
                         <span>HIVE POWER</span>
                     </div>
                     <div class="balance-card-value">{{ hivePower }}</div>
@@ -353,7 +394,7 @@
                 <div class="wallet-balances-grid">
                   <div class="balance-card">
                     <div class="balance-card-header">
-                        <img src="/img/actifit_logo.png" class="token-logo">
+                        <img src="/img/actifit_logo.png" class="token-logo" alt="">
                         <span>{{ $t('AFIT_Tokens') }}</span>
                     </div>
                     <div class="balance-card-value">{{ numberFormat(userTokenCount, 3) }}</div>
@@ -361,7 +402,7 @@
                   </div>
                   <div class="balance-card">
                     <div class="balance-card-header">
-                        <img src="/img/actifit_logo.png" class="token-logo">
+                        <img src="/img/actifit_logo.png" class="token-logo" alt="">
                         <span>{{ $t('AFIT_HE_Tokens') }}</span>
                     </div>
                     <div class="balance-card-value">{{ displayAFITHEBal }}</div>
@@ -369,7 +410,7 @@
                   </div>
                   <div class="balance-card">
                     <div class="balance-card-header">
-                        <img src="/img/AFITX.png" class="token-logo">
+                        <img src="/img/AFITX.png" class="token-logo" alt="">
                         <span>{{ $t('AFITX_HE_Tokens') }}</span>
                     </div>
                     <div class="balance-card-value">{{ displayAFITXHEBal }}</div>
@@ -377,7 +418,7 @@
                   </div>
                   <div class="balance-card tip-card">
                     <div class="balance-card-header">
-                        <img src="/img/actifit_logo.png" class="token-logo">
+                        <img src="/img/actifit_logo.png" class="token-logo" alt="">
                         <span>{{ $t('AFIT_Tip_Tokens') }}</span>
                         <i class="fas fa-info-circle ml-2 text-danger" @click="showAfitTipInfo = !showAfitTipInfo"></i>
                     </div>
@@ -413,7 +454,7 @@
             <div v-if="activeTab === 'badges'" class="badges-tab">
                 <div class="badge-list-item">
                   <div class="badge-image-container">
-                    <img class="badge-img" :class="{'badge-unclaimed': !userHasBadge(iso_badge)}" src="/img/badges/actifit_iso_badge.png">
+                    <img class="badge-img" :class="{'badge-unclaimed': !userHasBadge(iso_badge)}" src="/img/badges/actifit_iso_badge.png" alt="Actifit ISO badge">
                   </div>
                   <div class="badge-details">
                     <div class="badge-title">{{ $t('iso_badge_title') }}</div>
@@ -428,7 +469,7 @@
                       <div class="d-flex flex-wrap">
                         <div v-for="level in rewarded_posts_rules" :key="level[1]" class="m-2 text-center">
                            <div v-if="level[1] > 0 && level[1] <= maxClaimedActivityBadgeLevel()">
-                              <img class="badge-img-small" :class="{'badge-unclaimed': !userHasBadge(rew_activity_badge + level[1])}" :src="'/img/badges/actifit_rew_act_lev_' + level[1] + '_badge.png'">
+                              <img class="badge-img-small" :class="{'badge-unclaimed': !userHasBadge(rew_activity_badge + level[1])}" :src="'/img/badges/actifit_rew_act_lev_' + level[1] + '_badge.png'" :alt="`Actifit activity reward level ${level[1]} badge`">
                               <button v-if="badgeClaimable(rew_activity_badge + level[1])" @click="claimBadge(rew_activity_badge + level[1])" class="btn btn-danger btn-sm d-block mx-auto mt-1">{{ $t('Claim_badge') }}</button>
                            </div>
                         </div>
@@ -437,7 +478,7 @@
                 </div>
                 <div class="badge-list-item">
                   <div class="badge-image-container">
-                    <img class="badge-img" :class="{'badge-unclaimed': !userHasBadge(doubledup_badge)}" src="/img/badges/actifit_doubled_up_badge.png">
+                    <img class="badge-img" :class="{'badge-unclaimed': !userHasBadge(doubledup_badge)}" src="/img/badges/actifit_doubled_up_badge.png" alt="Actifit doubled-up badge">
                   </div>
                   <div class="badge-details">
                     <div class="badge-title">{{ $t('doubledup_badge_title') }}</div>
@@ -448,7 +489,7 @@
                 </div>
                  <div class="badge-list-item">
                   <div class="badge-image-container">
-                    <img class="badge-img" :class="{'badge-unclaimed': !userHasBadge(charity_badge)}" src="/img/badges/actifit_charity_badge.png">
+                    <img class="badge-img" :class="{'badge-unclaimed': !userHasBadge(charity_badge)}" src="/img/badges/actifit_charity_badge.png" alt="Actifit charity badge">
                   </div>
                   <div class="badge-details">
                     <div class="badge-title">{{ $t('charity_badge_title') }}</div>
@@ -465,15 +506,15 @@
 
           <h4 class="quick-links-title">{{ $t('Quick_Links') }}</h4>
           <a :href="'/activity/' + displayUser" class="quick-link-item">
-            <img src="/img/actifit_logo.png" class="mr-2 token-logo">
+            <img src="/img/actifit_logo.png" class="mr-2 token-logo" alt="">
             <span>{{ $t('Actifit_reports') }}</span>
           </a>
           <a :href="'/' + displayUser + '/blog'" class="quick-link-item">
-            <img src="/img/HIVE.png" class="mr-2 token-logo">
+            <img src="/img/HIVE.png" class="mr-2 token-logo" alt="">
             <span>{{ $t('Hive_blog') }}</span>
           </a>
           <a :href="'/' + displayUser + '/videos'" class="quick-link-item">
-            <img src="/img/3speak.png" class="mr-2 token-logo">
+            <img src="/img/3speak.png" class="mr-2 token-logo" alt="">
             <span>{{ $t('Threespeak_videos') }}</span>
           </a>
           <a :href="'/' + displayUser + '/comments'" class="quick-link-item">
@@ -529,6 +570,7 @@ import SSC from 'sscjs'
 const hsc = new SSC(process.env.hiveEngineRpc);
 import NotifyModal from '~/components/NotifyModal'
 import Lodash from 'lodash';
+import { buildMeasurementsMetadata, convertMeasurementValue, MEASUREMENT_KEYS, MEASUREMENT_UNIT_OPTIONS, mergeMeasurementSources, normalizeMeasurements, normalizeMeasurementUnit, selectLatestMeasurements, waitForMeasurementSave } from '~/utils/measurements'
 
 export default {
   head() {
@@ -538,9 +580,6 @@ export default {
         { hid: 'description', name: 'description', content: `View ${this.username}'s activity reports, fitness achievements, and earnings on Actifit — the move-to-earn platform that rewards your healthy lifestyle.` },
         { hid: 'ogdescription', name: 'og:description', property: 'og:description', content: `View ${this.username}'s activity reports and earnings on Actifit.` },
         { hid: 'ogtitle', name: 'og:title', property: 'og:title', content: `${this.username} on Actifit` }
-      ],
-      link: [
-        { rel: 'canonical', href: `https://actifit.io/${this.username}` }
       ]
     }
   },
@@ -606,7 +645,12 @@ export default {
       thighsUnit: '',
       lastBodyfat: '-',
       lastUpdated: '-',
+      reportMeasurements: [],
       userMeasurements: [],
+      measurementsEditOn: false,
+      savingMeasurements: false,
+      measurementSaveError: '',
+      measurementDraft: {},
       userActivity: [],
       lastActivityCount: '-',
       lastActivityDate: '-',
@@ -798,12 +842,36 @@ export default {
         return this.$route.params.username.substring(1, this.$route.params.username.length);
       }
       return this.$route.params.username
+    },
+    measurementFields() {
+      return [
+        { key: 'height', unitKey: 'heightUnit', label: 'Height' },
+        { key: 'bodyfat', unitKey: null, label: 'Body_Fat' },
+        { key: 'waist', unitKey: 'waistUnit', label: 'Waist' },
+        { key: 'weight', unitKey: 'weightUnit', label: 'Weight' },
+        { key: 'chest', unitKey: 'chestUnit', label: 'Chest' },
+        { key: 'thighs', unitKey: 'thighsUnit', label: 'Thighs' }
+      ]
+    },
+    measurementUnitOptions() {
+      return MEASUREMENT_UNIT_OPTIONS;
+    },
+    canEditMeasurements() {
+      return this.cur_bchain === 'HIVE' && this.isOwnAccount();
     }
   },
   methods: {
+    proceedLogout() {
+      this.$store.commit('setStdLoginUser', false);
+      if (process.client) {
+        localStorage.removeItem('std_login');
+        localStorage.removeItem('std_login_name');
+      }
+      this.$store.dispatch('steemconnect/logout');
+    },
     showModalFunc() {
+      this.showModal = true;
       this.$nextTick(() => {
-        this.showModal = true;
         if ($ && typeof $.fn.modal === 'function') {
           $('#loginModal').modal('show');
         }
@@ -891,6 +959,108 @@ export default {
 
       return {};
     },
+    getProfileMeasurements() {
+      const metadata = this.getProfileMetadata();
+      return normalizeMeasurements(metadata.profile && metadata.profile.actifit_measurements);
+    },
+    currentDisplayedMeasurements() {
+      return {
+        height: this.lastHeight === '-' ? '' : this.lastHeight,
+        heightUnit: normalizeMeasurementUnit('height', this.heightUnit),
+        weight: this.lastWeight === '-' ? '' : this.lastWeight,
+        weightUnit: normalizeMeasurementUnit('weight', this.weightUnit),
+        chest: this.lastChest === '-' ? '' : this.lastChest,
+        chestUnit: normalizeMeasurementUnit('chest', this.chestUnit),
+        waist: this.lastWaist === '-' ? '' : this.lastWaist,
+        waistUnit: normalizeMeasurementUnit('waist', this.waistUnit),
+        thighs: this.lastThighs === '-' ? '' : this.lastThighs,
+        thighsUnit: normalizeMeasurementUnit('thighs', this.thighsUnit),
+        bodyfat: this.lastBodyfat === '-' ? '' : this.lastBodyfat
+      };
+    },
+    changeMeasurementUnit(key, nextUnit) {
+      const unitKey = `${key}Unit`;
+      const previousUnit = normalizeMeasurementUnit(key, this.measurementDraft[unitKey]);
+      const normalizedNextUnit = normalizeMeasurementUnit(key, nextUnit);
+      const convertedValue = convertMeasurementValue(
+        key,
+        this.measurementDraft[key],
+        previousUnit,
+        normalizedNextUnit
+      );
+      this.$set(this.measurementDraft, key, convertedValue);
+      this.$set(this.measurementDraft, unitKey, normalizedNextUnit);
+    },
+    turnMeasurementsEditOn() {
+      this.measurementDraft = this.currentDisplayedMeasurements();
+      this.measurementSaveError = '';
+      this.measurementsEditOn = true;
+    },
+    turnMeasurementsEditOff() {
+      this.measurementsEditOn = false;
+      this.measurementSaveError = '';
+      this.measurementDraft = {};
+    },
+    async saveMeasurements() {
+      const values = {};
+      this.measurementSaveError = '';
+      MEASUREMENT_KEYS.forEach((key) => {
+        const rawValue = this.measurementDraft[key];
+        if (rawValue !== '' && rawValue !== null && typeof rawValue !== 'undefined') {
+          const numericValue = Number(rawValue);
+          if (!Number.isFinite(numericValue) || numericValue <= 0) {
+            this.measurementSaveError = this.$t('Measurements_positive_values');
+            return;
+          }
+          values[key] = numericValue;
+        }
+        const unitKey = `${key}Unit`;
+        if (key !== 'bodyfat' && this.measurementDraft[unitKey]) values[unitKey] = this.measurementDraft[unitKey];
+      });
+      if (this.measurementSaveError) return;
+      if (!MEASUREMENT_KEYS.some(key => Object.prototype.hasOwnProperty.call(values, key))) {
+        this.measurementSaveError = this.$t('Measurements_one_required');
+        return;
+      }
+
+      this.savingMeasurements = true;
+      this.measurementSaveError = '';
+      try {
+        const measurements = normalizeMeasurements({ ...values, updated_at: new Date().toISOString() });
+        const timeoutError = this.$t('error_performing_operation');
+        const metadataOutcome = await waitForMeasurementSave(
+          this.getLiveProfileMetadata().then(metadata => ({ success: true, metadata })),
+          timeoutError
+        );
+        if (!metadataOutcome.success) throw new Error(metadataOutcome.error || this.$t('Save_Error'));
+
+        const parsedData = metadataOutcome.metadata;
+        const postingMetadata = buildMeasurementsMetadata(parsedData, measurements);
+        const transaction = {
+          account: this.user.account.name,
+          // Empty is account_update2's no-change sentinel for legacy metadata.
+          // A non-empty value would require the active key instead of posting.
+          json_metadata: '',
+          posting_json_metadata: JSON.stringify(postingMetadata),
+          extensions: []
+        };
+        const outcome = await waitForMeasurementSave(
+          this.$processTrxFunc('account_update2', transaction, false),
+          timeoutError
+        );
+        if (outcome && outcome.error === 'user_cancel') return;
+        if (!outcome || !outcome.success) throw new Error((outcome && outcome.error) || this.$t('Save_Error'));
+
+        this.userinfo = { ...this.userinfo, posting_json_metadata: transaction.posting_json_metadata };
+        this.applyMeasurementSources();
+        this.turnMeasurementsEditOff();
+        this.$notify({ group: 'success', text: this.$t('Measurements_saved'), position: 'top center' });
+      } catch (error) {
+        this.measurementSaveError = error && error.message ? error.message : this.$t('Save_Error');
+      } finally {
+        this.savingMeasurements = false;
+      }
+    },
     syncAboutFieldsFromProfile(profile = {}) {
       this.textAreaLocationValue = profile.location || '';
       this.textAreaDescriptionValue = profile.about || '';
@@ -912,19 +1082,14 @@ export default {
         nextProfile.profile_image = updateData;
       }
       let pst = {
-        profile: {
-          profile_image: nextProfile.profile_image || '',
-          location: nextProfile.location || '',
-          about: nextProfile.about || '',
-          website: nextProfile.website || '',
-          name: nextProfile.name || '',
-          version: 2
-        }
+        ...parsedData,
+        profile: nextProfile
       }
       let transaction = {
+        // Empty preserves legacy metadata while keeping this a posting-authority update.
         account: this.user.account.name, json_metadata: '', posting_json_metadata: JSON.stringify(pst), extensions: []
       };
-      return await this.$processTrxFunc('account_update2', transaction);
+      return await this.$processTrxFunc('account_update2', transaction, false);
     },
     async updateProfileImage(imageUrl) {
         this.updatingField = 'profile_image';
@@ -1601,6 +1766,28 @@ export default {
       }
       return properNode;
     },
+    async getLiveProfileMetadata() {
+      const accountName = this.user && this.user.account && this.user.account.name;
+      if (!accountName) throw new Error(this.$t('Save_Error'));
+
+      const chainLnk = this.setProperNode();
+      return new Promise((resolve, reject) => {
+        chainLnk.api.getAccounts([accountName], (err, result) => {
+          const account = Array.isArray(result) ? result[0] : null;
+          if (err || !account || typeof account.posting_json_metadata !== 'string') {
+            reject(err || new Error(this.$t('Save_Error')));
+            return;
+          }
+
+          try {
+            resolve(account.posting_json_metadata ? JSON.parse(account.posting_json_metadata) || {} : {});
+          } catch (parseError) {
+            console.error('Unable to parse live profile metadata', parseError);
+            resolve({});
+          }
+        });
+      });
+    },
     async getAccountData() {
       let parentRef = this;
       let chainLnk = await this.setProperNode();
@@ -1619,6 +1806,7 @@ export default {
           } else {
             parentRef.userinfo = result[0];
             parentRef.syncAboutFieldsFromProfile(parentRef.userMeta && parentRef.userMeta.profile ? parentRef.userMeta.profile : {});
+            parentRef.applyMeasurementSources();
 
             if (parentRef.cur_bchain === 'HIVE') {
               parentRef.hiveBalance = parentRef.numberFormat(parseFloat(parentRef.userinfo.balance), 3);
@@ -1728,22 +1916,26 @@ export default {
       }
     },
     async setUserMeasurements(json) {
-      this.userMeasurements = json;
-      if (Array.isArray(json) && json.length > 0) {
-        let latest = json[0].json_metadata;
-        this.lastHeight = latest.height || '-';
-        this.heightUnit = latest.heightUnit || '';
-        this.lastWeight = latest.weight || '-';
-        this.weightUnit = latest.weightUnit || '';
-        this.lastChest = latest.chest || '-';
-        this.chestUnit = latest.chestUnit || '';
-        this.lastWaist = latest.waist || '-';
-        this.waistUnit = latest.waistUnit || '';
-        this.lastThighs = latest.thighs || '-';
-        this.thighsUnit = latest.thighsUnit || '';
-        this.lastBodyfat = latest.bodyfat || '-';
-        this.lastUpdated = json[0].date || '-';
-      }
+      this.reportMeasurements = Array.isArray(json) ? json : [];
+      this.applyMeasurementSources();
+    },
+    applyMeasurementSources() {
+      const profileMeasurements = this.getProfileMeasurements();
+      this.userMeasurements = mergeMeasurementSources(this.reportMeasurements, profileMeasurements);
+      const latestSnapshot = selectLatestMeasurements(this.userMeasurements);
+      const latest = latestSnapshot.measurements;
+      this.lastHeight = latest.height || '-';
+      this.heightUnit = latest.heightUnit || '';
+      this.lastWeight = latest.weight || '-';
+      this.weightUnit = latest.weightUnit || '';
+      this.lastChest = latest.chest || '-';
+      this.chestUnit = latest.chestUnit || '';
+      this.lastWaist = latest.waist || '-';
+      this.waistUnit = latest.waistUnit || '';
+      this.lastThighs = latest.thighs || '-';
+      this.thighsUnit = latest.thighsUnit || '';
+      this.lastBodyfat = latest.bodyfat || '-';
+      this.lastUpdated = latestSnapshot.updatedAt;
     },
     async setUserActivity(json) {
       this.userActivity = json;
@@ -1989,6 +2181,37 @@ html.dark-mode .user-info-header .join-date {
     flex-shrink: 0;
 }
 .user-info-header { margin-left: 20px; }
+.profile-account-actions {
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.profile-action-btn {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+  background-color: var(--brand-color);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 10px;
+  font-weight: 600;
+  box-shadow: var(--box-shadow-lifted);
+  transition: transform 0.2s, opacity 0.2s;
+}
+.profile-action-btn:hover,
+.profile-action-btn:focus {
+  color: #fff;
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+html.dark-mode .profile-action-btn {
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: none;
+}
 .avatar-edit-button {
   position: absolute;
   bottom: 5px;
@@ -2116,6 +2339,33 @@ html.dark-mode .user-info-header .join-date {
     gap: 15px;
 }
 .fitness-section-grid-measurements { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 15px; }
+.fitness-measurements-editor { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.fitness-measurements-toolbar { display: flex; justify-content: center; align-items: stretch; flex-wrap: nowrap; gap: 10px; }
+.fitness-measurements-toolbar .btn { flex: 0 1 220px; min-width: 0; margin: 0; display: flex; justify-content: center; align-items: center; }
+.measurement-form {
+    background: var(--wallet-action-box-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 15px;
+    text-align: left;
+}
+.measurement-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.measurement-field { color: var(--text-color-primary); font-weight: 600; margin: 0; }
+.measurement-input-group { display: flex; margin-top: 5px; }
+.measurement-input-group input,
+.measurement-input-group select {
+    min-width: 0;
+    width: 100%;
+    border: 1px solid var(--border-color);
+    background: var(--white-color);
+    color: var(--text-color-primary);
+    border-radius: 4px;
+    padding: 7px 9px;
+}
+.measurement-input-group .measurement-unit { flex: 0 0 65px; margin-left: 5px; }
+.measurement-unit-label { padding: 8px; color: var(--text-color-secondary); }
+.measurement-form-actions { display: flex; justify-content: center; gap: 8px; margin-top: 15px; }
+.measurement-updated { color: var(--text-color-secondary); text-align: center; }
 .fitness-action-btn-container { text-align: center; }
 .fitness-card {
     background: var(--fitness-card-gradient);
@@ -2321,6 +2571,14 @@ html.dark-mode .interactive-prompt {
         margin-left: 0;
         text-align: center;
         width: 100%;
+    }
+    .profile-account-actions {
+        width: 100%;
+        max-width: 320px;
+        flex-direction: row;
+    }
+    .profile-action-btn {
+        flex: 1;
     }
     .wallet-top-actions {
         flex-direction: column;

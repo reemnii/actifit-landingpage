@@ -53,7 +53,7 @@
                     class="text-white fas fa-reply"></i></a></span>
               <span>
                 <a href="#" @click.prevent="votePrompt($event)" data-toggle="modal" class="text-brand"
-                  data-target="#voteModal" v-if="this.$parent.user && userVotedThisPost() == true">
+                  data-target="#voteModal" v-if="user && userVotedThisPost() == true">
                   <i class="far fa-thumbs-up"></i> {{ getVoteCount }}
                 </a>
                 <a href="#" @click.prevent="votePrompt($event)" data-toggle="modal" data-target="#voteModal"
@@ -74,108 +74,102 @@
           <a href="#" v-on:click.prevent="cancelTranslation">{{ $t('click_to_view_original') }}</a>
         </div>
         <SafeRemarkable class="modal-body" :source="displayBody" :options="{ 'html': true, 'breaks': true, 'typographer': true }" ref="remarkableContent"></SafeRemarkable>
-        <div class="modal-body goog-ad-horiz-90">
-          <adsbygoogle ad-slot="5716623705" />
-        </div>
-        <div class="main-payment-info col-12" id="modal-footer">
-          <div >
-            <span><a href="#" @click.prevent="toggleCommentBox()" :title="$t('Reply')"><i
-                  class="text-white fas fa-reply"></i></a></span>
-            <span class="ml-2">
-
-              <a href="#" @click.prevent="votePrompt($event)" data-toggle="modal" class="text-brand"
-                data-target="#voteModal" v-if="this.$parent.user && userVotedThisPost() == true">
+        <div class="main-payment-info col-12 post-detail-footer" id="modal-footer">
+          <div class="post-detail-footer__summary">
+            <div class="post-detail-footer__actions">
+              <a href="#" class="post-detail-action" @click.prevent="toggleCommentBox()" :title="$t('Reply')">
+                <i class="fas fa-reply"></i>
+              </a>
+              <a href="#" class="post-detail-action"
+                :class="{ 'post-detail-action--active': user && userVotedThisPost() == true }"
+                @click.prevent="votePrompt($event)" data-toggle="modal" data-target="#voteModal">
                 <i class="far fa-thumbs-up"></i> {{ getVoteCount }}
               </a>
-              <a href="#" @click.prevent="votePrompt($event)" data-toggle="modal" data-target="#voteModal"
-                class="actifit-link-plain" v-else>
-                <i class="far fa-thumbs-up"></i> {{ getVoteCount }}
+              <a href="#" class="post-detail-action" @click.prevent="headToComments()" :title="$t('comments')">
+                <i class="far fa-comments"></i> {{ post.children }}
               </a>
-              <i class="far fa-comments ml-2" @click.prevent="headToComments()"></i> {{ post.children }}
-              <i class="far fa-share-square ml-2" @click.prevent="$reblog(user, post)"
-                v-if="user && post.author != this.user.account.name" :title="$t('reblog')"></i>
-            </span>
-            <div>
-              <!--<small :title="afitReward +' ' + $t('AFIT_Token')">
-					<img src="/img/actifit_logo.png" class="mr-1 currency-logo-small">{{ afitReward }} {{ $t('AFIT_Token') }}
-				</small>-->
-              <span :title="postPayout" class="p-0 m-0">
-                <img src="/img/STEEM.png" class="currency-logo-small" v-if="cur_bchain == 'STEEM'">
-                <img src="/img/HIVE.png" class="currency-logo-small" v-else-if="cur_bchain == 'HIVE'">
-                <img src="/img/BLURT.png" class="currency-logo-small" v-else-if="cur_bchain == 'BLURT'">
-                <!--{{ postPayout }}-->
-              </span>
+              <a href="#" class="post-detail-action" @click.prevent="$reblog(user, post)"
+                v-if="user && post.author != this.user.account.name" :title="$t('reblog')">
+                <i class="far fa-share-square"></i>
+              </a>
+            </div>
 
-              <span v-if="postPaid()">
-                <!--<i class="fa-solid fa-wallet text-green"></i>-->
-                <span class="m-1" :title="$t('author_payout')">
-                  <i class="fa-solid fa-user"></i>
-                  {{ paidValue() }}
+            <div class="post-detail-footer__payout">
+              <span class="post-detail-payout" :title="postPayout">
+                <img src="/img/STEEM.png" class="currency-logo-small" v-if="cur_bchain == 'STEEM'" alt="">
+                <img src="/img/HIVE.png" class="currency-logo-small" v-else-if="cur_bchain == 'HIVE'" alt="">
+                <img src="/img/BLURT.png" class="currency-logo-small" v-else-if="cur_bchain == 'BLURT'" alt="">
+                <span v-if="postPaid()">
+                  <span :class="{ 'declined-payout': isDeclined }" :title="$t('author_payout')">
+                    <i class="fa-solid fa-user"></i> {{ paidValue() }}
+                  </span>
+                  <span :class="{ 'declined-payout': isDeclined }" :title="$t('voters_payout')">
+                    <i class="fa-solid fa-users"></i> {{ post.curator_payout_value }}
+                  </span>
+                  <i class="fa-solid fa-check post-detail-payout__paid"></i>
                 </span>
-                <span class="m-1" :title="$t('voters_payout')">
-                  <i class="fa-solid fa-users"></i>
-                  {{ post.curator_payout_value }}
+                <span v-else>
+                  <span :class="{ 'declined-payout': isDeclined }">{{ post.pending_payout_value }}</span>
+                  <i class="fa-solid fa-hourglass-half post-detail-payout__wait" :title="$t('hive_payouts_wait')"></i>
                 </span>
-                <i class="fa-solid fa-check text-green text-bold"></i>
+                <span v-if="hasBeneficiaries()" class="post-detail-payout__muted" :title="beneficiariesDisplay()">
+                  <i class="fas fa-user-pen"><sup>{{ post.beneficiaries.length }}</sup></i>
+                </span>
               </span>
-              <span v-else>
-                <span class="text-bold">{{ post.pending_payout_value }}</span>
-                <i class="fa-solid fa-hourglass-half text-brand m-1" :title="$t('hive_payouts_wait')"></i>
-              </span>
-              <span v-if="hasBeneficiaries()" :title="beneficiariesDisplay()">
-                <i class="fas fa-user-pen"><sup>{{ post.beneficiaries.length }}</sup></i>
-              </span>
-
-              <span @click.prevent="displayMorePayoutData = !displayMorePayoutData" class="text-brand pointer-cur-cls"
-                :title="$t('more_token_rewards')">
+              <button type="button" class="post-detail-payout-toggle"
+                @click="displayMorePayoutData = !displayMorePayoutData" :title="$t('more_token_rewards')"
+                :aria-expanded="displayMorePayoutData ? 'true' : 'false'">
                 <i class="fas fa-chevron-circle-down" v-if="!displayMorePayoutData"></i>
                 <i class="fas fa-chevron-circle-up" v-else></i>
-              </span>
-              <transition name="fade" v-if="displayMorePayoutData">
-                <div class="m-2">
-                  <small v-for="(token, index) in tokenRewards" :key="index" :title="displayTokenValue(token)">
-                    {{ displayTokenValue(token) }} |
-                  </small>
+              </button>
+            </div>
+
+            <div class="post-detail-footer__sharing">
+              <social-sharing :url="formattedPostUrl" :title="post.title"
+                description="Signup to Actifit, the mobile dapp that incentivizes healthy lifestyle and rewards your everyday activity "
+                quote="Signup to Actifit, the mobile dapp that incentivizes healthy lifestyle and rewards your everyday activity"
+                :hashtags="hashtags" twitter-user="actifit_fitness" inline-template>
+                <div class="share-links-actifit">
+                  <network network="facebook">
+                    <i class="fab fa-facebook" title="facebook"></i>
+                  </network>
+                  <network network="twitter">
+                    <i class="fab fa-x-twitter" title="X (twitter)"></i>
+                  </network>
+                  <network network="telegram">
+                    <i class="fab fa-telegram" title="telegram"></i>
+                  </network>
+                  <network network="whatsapp">
+                    <i class="fab fa-whatsapp" title="whatsapp"></i>
+                  </network>
+                  <network network="linkedin">
+                    <i class="fab fa-linkedin" title="linkedin"></i>
+                  </network>
+                  <network network="reddit">
+                    <i class="fab fa-reddit" title="reddit"></i>
+                  </network>
+                  <network network="skype">
+                    <i class="fab fa-skype" title="skype"></i>
+                  </network>
+                  <network network="sms">
+                    <i class="fas fa-comment" title="SMS"></i>
+                  </network>
+                  <network network="email">
+                    <i class="fa fa-envelope" title="email"></i>
+                  </network>
                 </div>
-              </transition>
+              </social-sharing>
             </div>
           </div>
-          <div>
-            <social-sharing :url="formattedPostUrl" :title="post.title"
-              description="Signup to Actifit, the mobile dapp that incentivizes healthy lifestyle and rewards your everyday activity "
-              quote="Signup to Actifit, the mobile dapp that incentivizes healthy lifestyle and rewards your everyday activity"
-              :hashtags="hashtags" twitter-user="actifit_fitness" inline-template>
-              <div class="share-links-actifit">
-                <network network="facebook">
-                  <i class="fab fa-facebook" title="facebook"></i>
-                </network>
-                <network network="twitter">
-                  <i class="fab fa-x-twitter" title="X (twitter)"></i>
-                </network>
-                <network network="telegram">
-                  <i class="fab fa-telegram" title="telegram"></i>
-                </network>
-                <network network="whatsapp">
-                  <i class="fab fa-whatsapp" title="whatsapp"></i>
-                </network>
-                <network network="linkedin">
-                  <i class="fab fa-linkedin" title="linkedin"></i>
-                </network>
-                <network network="reddit">
-                  <i class="fab fa-reddit" title="reddit"></i>
-                </network>
-                <network network="skype">
-                  <i class="fab fa-skype" title="skype"></i>
-                </network>
-                <network network="sms">
-                  <i class="fas fa-comment" title="SMS"></i>
-                </network>
-                <network network="email">
-                  <i class="fa fa-envelope" title="email"></i>
-                </network>
-              </div>
-            </social-sharing>
-          </div>
+
+          <transition name="fade">
+            <div v-if="displayMorePayoutData" class="post-detail-footer__tokens">
+              <small v-for="(token, index) in tokenRewards" :key="index" :title="displayTokenValue(token)">
+                {{ displayTokenValue(token) }}<span v-if="index < tokenRewards.length - 1"> | </span>
+              </small>
+            </div>
+          </transition>
+
         </div>
         <!-- adding section to display additional FULL Payout option -->
         <div class="modal-footer" v-if="this.meta.full_afit_pay == 'on'">
@@ -215,30 +209,30 @@
               <div class="bchain-option btn col-6 p-2 row text-left mx-auto" v-if="cur_bchain == 'HIVE'">
                 <input type="radio" id="hive" value="HIVE" v-model="target_bchain">
                 <img src="/img/HIVE.png" style="max-height: 50px" v-on:click="target_bchain = 'HIVE'"
-                  :class="adjustHiveClass">
+                  :class="adjustHiveClass" alt="Select Hive blockchain">
                 <label for="hive">HIVE ONLY</label>
               </div>
               <div class="bchain-option btn col-6 p-2 row text-left mx-auto" v-else-if="cur_bchain == 'STEEM'">
                 <input type="radio" id="steem" value="STEEM" v-model="target_bchain">
                 <img src="/img/STEEM.png" style="max-height: 50px" v-on:click="target_bchain = 'STEEM'"
-                  :class="adjustSteemClass">
+                  :class="adjustSteemClass" alt="Select Steem blockchain">
                 <label for="steem">STEEM ONLY</label>
               </div>
               <div class="bchain-option btn col-6 p-2 row text-left  mx-auto">
                 <input type="radio" id="hive_steem" value="BOTH" v-model="target_bchain">
                 <img src="/img/HIVE.png" v-on:click="target_bchain = 'BOTH'" style="max-height: 50px"
-                  :class="adjustBothClass">
+                  :class="adjustBothClass" alt="Select multiple blockchains">
                 <img src="/img/STEEM.png" v-on:click="target_bchain = 'BOTH'" style="max-height: 50px"
-                  :class="adjustBothClass">
+                  :class="adjustBothClass" alt="Select multiple blockchains">
                 <label for="hive_steem">HIVE + STEEM</label>
               </div>
             </div>
             <a href="#" @click.prevent="postResponse($event)" class="btn btn-brand border reply-btn w-25">
               {{ $t('Post') }}
               <img src="/img/HIVE.png" style="max-height: 25px"
-                v-if="target_bchain == 'HIVE' || target_bchain == 'BOTH'">
+                v-if="target_bchain == 'HIVE' || target_bchain == 'BOTH'" alt="">
               <img src="/img/STEEM.png" style="max-height: 25px"
-                v-if="target_bchain == 'STEEM' || target_bchain == 'BOTH'">
+                v-if="target_bchain == 'STEEM' || target_bchain == 'BOTH'" alt="">
               <i class="fas fa-spin fa-spinner" v-if="loading"></i>
             </a>
             <a href="#" @click.prevent="resetOpenComment()" class="btn btn-brand border reply-btn w-25">{{ $t('Cancel')
@@ -285,12 +279,14 @@ import SafeRemarkable from '~/components/SafeRemarkable.vue'
 import SocialSharing from 'vue-social-sharing';
 import VueScrollTo from 'vue-scrollto'
 import { translateTextWithGemini } from '~/components/gemini-client.js';
+import { declinedPayoutMixin } from '~/plugins/commonCardMixin.js'
 
 const scot_steemengine_api = process.env.steemEngineScot;
 const scot_hive_api_param = process.env.hiveEngineScotParam;
 const tokensOfInterest = ['SPORTS', 'PAL', 'APX'];
 
 export default {
+  mixins: [declinedPayoutMixin],
   data() {
     return {
       // ✅ CORE FIX: Initialize the translation cache object.
@@ -354,6 +350,7 @@ export default {
     UserHoverCard
   },
   computed: {
+    cardData() { return this.post },
     ...mapGetters('steemconnect', ['user']),
     ...mapGetters('steemconnect', ['stdLogin']),
     ...mapGetters(['commentEntries'], 'commentCountToday'),
@@ -949,6 +946,150 @@ export default {
 .share-links-actifit span {
   padding: 5px;
   cursor: pointer;
+}
+
+/* Match the neutral, compact action row used by revamped comments. */
+#modal-footer.post-detail-footer {
+  --post-footer-brand: #FF112D;
+  --post-footer-brand-dark: #D40E24;
+  --post-footer-border: #E6E8EB;
+  --post-footer-muted: #6B7280;
+  --post-footer-muted-soft: #9AA0A6;
+  --post-footer-green: #1E8E5A;
+  margin-top: 12px;
+  padding: 14px 15px 9px;
+  border-top: 1px solid var(--post-footer-border);
+  border-bottom: 1px solid var(--post-footer-border);
+  background: transparent !important;
+  color: var(--post-footer-muted) !important;
+  font-size: 12.5px;
+}
+
+#modal-footer .post-detail-footer__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+
+#modal-footer .post-detail-footer__actions,
+#modal-footer .post-detail-footer__payout,
+#modal-footer .post-detail-payout,
+#modal-footer .post-detail-payout > span {
+  display: flex;
+  align-items: center;
+}
+
+#modal-footer .post-detail-footer__actions {
+  gap: 16px;
+}
+
+#modal-footer .post-detail-footer__payout {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+#modal-footer .post-detail-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--post-footer-muted);
+  text-decoration: none;
+  transition: color .15s ease;
+}
+
+#modal-footer .post-detail-action:hover,
+#modal-footer .post-detail-action--active {
+  color: var(--post-footer-brand);
+}
+
+#modal-footer .post-detail-payout {
+  gap: 6px;
+  color: var(--post-footer-brand-dark);
+  font-weight: 700;
+}
+
+#modal-footer .post-detail-payout > span {
+  gap: 8px;
+}
+
+#modal-footer .post-detail-payout i:not(.post-detail-payout__paid),
+#modal-footer .post-detail-payout__wait,
+#modal-footer .post-detail-payout__muted {
+  color: var(--post-footer-muted-soft);
+}
+
+#modal-footer .post-detail-payout__paid {
+  color: var(--post-footer-green);
+}
+
+#modal-footer .post-detail-payout-toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--post-footer-muted-soft);
+  cursor: pointer;
+}
+
+#modal-footer .post-detail-payout-toggle:hover {
+  color: var(--post-footer-brand);
+}
+
+#modal-footer .post-detail-payout-toggle:focus-visible {
+  outline: 2px solid var(--post-footer-brand);
+  outline-offset: 3px;
+}
+
+#modal-footer .post-detail-footer__tokens {
+  margin-top: 10px;
+  color: var(--post-footer-muted);
+  text-align: right;
+}
+
+#modal-footer .post-detail-footer__sharing {
+  flex: 0 0 100%;
+  margin-top: 6px;
+  text-align: right;
+}
+
+#modal-footer .share-links-actifit span {
+  padding: 2px 3px;
+  color: var(--post-footer-muted);
+  transition: color .15s ease;
+}
+
+#modal-footer .share-links-actifit span:hover {
+  color: var(--post-footer-brand);
+}
+
+.dark-mode #modal-footer.post-detail-footer {
+  --post-footer-brand: #FF5266;
+  --post-footer-brand-dark: #FF7181;
+  --post-footer-border: rgba(255, 255, 255, .14);
+  --post-footer-muted: #ADB5BD;
+  --post-footer-muted-soft: #8F969D;
+  --post-footer-green: #62C995;
+}
+
+@media (max-width: 767px) {
+  #modal-footer .post-detail-footer__summary,
+  #modal-footer .post-detail-footer__payout {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #modal-footer .post-detail-footer__payout {
+    gap: 8px;
+  }
+
+  #modal-footer .post-detail-footer__tokens,
+  #modal-footer .post-detail-footer__sharing,
+  #modal-footer .share-links-actifit {
+    margin-left: 0;
+    text-align: left;
+  }
 }
 
 .post-modal-prelim-info span {
